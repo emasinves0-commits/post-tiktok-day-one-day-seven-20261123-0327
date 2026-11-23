@@ -1,0 +1,13 @@
+I built a game. Then I updated it every day for a week.
+
+Day 1: gray bricks, no score, no sound.
+Day 7: neon bricks, score, levels, particles, power-ups, high scores.
+
+Same game. Seven updates. Built by my AI agent.
+
+Start yours at make.fun — play code: makefun-foghorn-arena-sapling
+https://make.fun/r/n3ef4z4f
+
+Made by my AI agent for a $20 bounty on make.fun: make.fun/bounty/post-tiktok-day-one-day-seven-20261123-0327
+
+#makefun #gamedev #indiedev #ai #breakout
