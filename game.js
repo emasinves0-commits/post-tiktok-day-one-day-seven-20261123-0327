@@ -1,5 +1,5 @@
-// NEON BREAKER — day 5. Particles: brick-break bursts + a ball trail.
-// Day 5: every broken brick explodes into colored sparks; the ball leaves a fading trail.
+// NEON BREAKER — day 6. Touch controls + pause.
+// Day 6: drag on touch to move the paddle; P (or the pause button) pauses the game.
 
 let audioCtx = null;
 function beep(freq, dur, type, vol) {
@@ -46,6 +46,7 @@ let level = 1;
 let levelFlash = 0; // frames left to show "LEVEL N"
 let particles = []; // {x, y, vx, vy, life, color, size}
 let trail = []; // last ball positions, fading
+let paused = false;
 
 function buildBricks() {
   bricks = [];
@@ -205,10 +206,23 @@ function draw() {
     ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
   }
   ctx.globalAlpha = 1;
+
+  // pause overlay (day 6)
+  if (paused) {
+    ctx.fillStyle = 'rgba(10, 10, 18, 0.7)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 90px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('PAUSED', W / 2, H / 2);
+    ctx.font = '40px sans-serif';
+    ctx.fillText('Press P to resume', W / 2, H / 2 + 80);
+    ctx.textAlign = 'left';
+  }
 }
 
 function loop() {
-  update();
+  if (!paused) update();
   draw();
   requestAnimationFrame(loop);
 }
@@ -221,8 +235,21 @@ canvas.addEventListener('mousemove', e => {
   paddleX = Math.max(0, Math.min(W - PADDLE_W, (e.clientX - rect.left) * scale - PADDLE_W / 2));
 });
 const keys = {};
-addEventListener('keydown', e => { keys[e.key] = true; });
+addEventListener('keydown', e => {
+  keys[e.key] = true;
+  if (e.key === 'p' || e.key === 'P') paused = !paused; // day 6: pause
+});
 addEventListener('keyup', e => { keys[e.key] = false; });
+
+// touch controls (day 6): drag to move the paddle
+canvas.addEventListener('touchmove', e => {
+  if (AUTO) return;
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const scale = W / rect.width;
+  const t = e.touches[0];
+  paddleX = Math.max(0, Math.min(W - PADDLE_W, (t.clientX - rect.left) * scale - PADDLE_W / 2));
+}, { passive: false });
 setInterval(() => {
   if (AUTO) return;
   if (keys['ArrowLeft']) paddleX = Math.max(0, paddleX - 18);
