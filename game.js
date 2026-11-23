@@ -1,5 +1,5 @@
-// NEON BREAKER — day 4. Levels: clear the bricks to advance; faster ball each level.
-// Day 4: a level counter, a LEVEL UP flash, and +15% ball speed per level.
+// NEON BREAKER — day 5. Particles: brick-break bursts + a ball trail.
+// Day 5: every broken brick explodes into colored sparks; the ball leaves a fading trail.
 
 let audioCtx = null;
 function beep(freq, dur, type, vol) {
@@ -44,6 +44,8 @@ let bricks = [];
 let score = 0;
 let level = 1;
 let levelFlash = 0; // frames left to show "LEVEL N"
+let particles = []; // {x, y, vx, vy, life, color, size}
+let trail = []; // last ball positions, fading
 
 function buildBricks() {
   bricks = [];
@@ -60,6 +62,18 @@ function buildBricks() {
 
 function resetBall() {
   ball = { ...BALL_START };
+}
+
+function burst(x, y, color) {
+  for (let i = 0; i < 10; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = 2 + Math.random() * 6;
+    particles.push({
+      x, y,
+      vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 2,
+      life: 30 + Math.random() * 20, color, size: 4 + Math.random() * 6,
+    });
+  }
 }
 
 function update() {
@@ -99,6 +113,7 @@ function update() {
       b.alive = false;
       score += 10;
       sfxBrick();
+      burst(b.x + b.w / 2, b.y + b.h / 2, b.color);
       // bounce: reverse the axis of least penetration
       const overlapX = Math.min(ball.x + BALL_R - b.x, b.x + b.w - (ball.x - BALL_R));
       const overlapY = Math.min(ball.y + BALL_R - b.y, b.y + b.h - (ball.y - BALL_R));
@@ -121,6 +136,16 @@ function update() {
     ball.vy = BALL_START.vy * boost;
   }
   if (levelFlash > 0) levelFlash--;
+
+  // particles: gravity + fade (day 5)
+  for (const p of particles) {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.25; p.life--;
+  }
+  particles = particles.filter(p => p.life > 0);
+
+  // ball trail (day 5): keep the last 12 positions
+  trail.push({ x: ball.x, y: ball.y });
+  if (trail.length > 12) trail.shift();
 }
 
 function draw() {
@@ -158,11 +183,28 @@ function draw() {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(paddleX, PADDLE_Y, PADDLE_W, PADDLE_H);
 
+  // ball trail (day 5): fading circles behind the ball
+  for (let i = 0; i < trail.length; i++) {
+    const t = trail[i];
+    ctx.fillStyle = 'rgba(255, 255, 255, ' + (i / trail.length * 0.35) + ')';
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, BALL_R * (0.4 + 0.6 * i / trail.length), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   // ball
   ctx.fillStyle = '#ffffff';
   ctx.beginPath();
   ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
   ctx.fill();
+
+  // particles (day 5)
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(0, p.life / 50);
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+  }
+  ctx.globalAlpha = 1;
 }
 
 function loop() {
