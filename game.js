@@ -1,6 +1,5 @@
-// NEON BREAKER — day 1. A tiny breakout game, built by an AI agent.
-// Day 1: the bare game. Paddle, ball, bricks. No score, no sound, no effects.
-// Later updates (days 2-7) add score, sound, levels, particles, touch, power-ups, high scores.
+// NEON BREAKER — day 2. Score display + colored bricks.
+// Day 2: a HUD (score + bricks left) and a neon color per brick row.
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -13,6 +12,7 @@ const ROWS = 5, COLS = 8;
 const BRICK_W = 120, BRICK_H = 44, GAP = 8;
 const BRICK_TOP = 220;
 const BRICK_LEFT = (W - (COLS * BRICK_W + (COLS - 1) * GAP)) / 2;
+const ROW_COLORS = ['#ff2d78', '#ff9f1c', '#ffee3a', '#2ec4b6', '#3a86ff'];
 
 const PADDLE_W = 220, PADDLE_H = 24, PADDLE_Y = 1700;
 const BALL_R = 18;
@@ -21,6 +21,7 @@ const BALL_START = { x: 540, y: 1200, vx: 5, vy: -7 };
 let paddleX = (W - PADDLE_W) / 2;
 let ball = { ...BALL_START };
 let bricks = [];
+let score = 0;
 
 function buildBricks() {
   bricks = [];
@@ -29,7 +30,7 @@ function buildBricks() {
       bricks.push({
         x: BRICK_LEFT + c * (BRICK_W + GAP),
         y: BRICK_TOP + r * (BRICK_H + GAP),
-        w: BRICK_W, h: BRICK_H, alive: true,
+        w: BRICK_W, h: BRICK_H, alive: true, color: ROW_COLORS[r],
       });
     }
   }
@@ -73,6 +74,7 @@ function update() {
     if (ball.x + BALL_R > b.x && ball.x - BALL_R < b.x + b.w &&
         ball.y + BALL_R > b.y && ball.y - BALL_R < b.y + b.h) {
       b.alive = false;
+      score += 10;
       // bounce: reverse the axis of least penetration
       const overlapX = Math.min(ball.x + BALL_R - b.x, b.x + b.w - (ball.x - BALL_R));
       const overlapY = Math.min(ball.y + BALL_R - b.y, b.y + b.h - (ball.y - BALL_R));
@@ -92,12 +94,21 @@ function draw() {
   ctx.fillStyle = '#0a0a12';
   ctx.fillRect(0, 0, W, H);
 
-  // bricks (day 1: plain gray)
-  ctx.fillStyle = '#888888';
+  // bricks (day 2: one neon color per row)
   for (const b of bricks) {
     if (!b.alive) continue;
+    ctx.fillStyle = b.color;
     ctx.fillRect(b.x, b.y, b.w, b.h);
   }
+
+  // HUD (day 2: score + bricks left)
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 44px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('SCORE ' + score, 32, 80);
+  ctx.textAlign = 'right';
+  ctx.fillText('BRICKS ' + bricks.filter(b => b.alive).length, W - 32, 80);
+  ctx.textAlign = 'left';
 
   // paddle
   ctx.fillStyle = '#ffffff';
