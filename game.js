@@ -1,5 +1,5 @@
-// NEON BREAKER — day 3. Sound effects (WebAudio synth bleeps).
-// Day 3: a tiny synth — paddle blip, brick break, wall tick, ball-lost fall.
+// NEON BREAKER — day 4. Levels: clear the bricks to advance; faster ball each level.
+// Day 4: a level counter, a LEVEL UP flash, and +15% ball speed per level.
 
 let audioCtx = null;
 function beep(freq, dur, type, vol) {
@@ -42,6 +42,8 @@ let paddleX = (W - PADDLE_W) / 2;
 let ball = { ...BALL_START };
 let bricks = [];
 let score = 0;
+let level = 1;
+let levelFlash = 0; // frames left to show "LEVEL N"
 
 function buildBricks() {
   bricks = [];
@@ -108,8 +110,17 @@ function update() {
   // ball fell: relaunch (day 1 has no lives)
   if (ball.y - BALL_R > H) { sfxLost(); resetBall(); }
 
-  // all bricks cleared: rebuild (day 1 has no levels)
-  if (bricks.every(b => !b.alive)) buildBricks();
+  // all bricks cleared: next level (day 4) — rebuild, faster ball, flash the level
+  if (bricks.every(b => !b.alive)) {
+    level++;
+    levelFlash = 120;
+    buildBricks();
+    resetBall();
+    const boost = 1 + 0.15 * (level - 1);
+    ball.vx = BALL_START.vx * boost;
+    ball.vy = BALL_START.vy * boost;
+  }
+  if (levelFlash > 0) levelFlash--;
 }
 
 function draw() {
@@ -123,14 +134,25 @@ function draw() {
     ctx.fillRect(b.x, b.y, b.w, b.h);
   }
 
-  // HUD (day 2: score + bricks left)
+  // HUD (day 2: score + bricks left; day 4: level)
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 44px sans-serif';
   ctx.textAlign = 'left';
   ctx.fillText('SCORE ' + score, 32, 80);
+  ctx.textAlign = 'center';
+  ctx.fillText('LEVEL ' + level, W / 2, 80);
   ctx.textAlign = 'right';
   ctx.fillText('BRICKS ' + bricks.filter(b => b.alive).length, W - 32, 80);
   ctx.textAlign = 'left';
+
+  // level-up flash (day 4)
+  if (levelFlash > 0) {
+    ctx.fillStyle = 'rgba(255, 255, 255, ' + Math.min(1, levelFlash / 60) + ')';
+    ctx.font = 'bold 90px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('LEVEL ' + level, W / 2, H / 2);
+    ctx.textAlign = 'left';
+  }
 
   // paddle
   ctx.fillStyle = '#ffffff';
