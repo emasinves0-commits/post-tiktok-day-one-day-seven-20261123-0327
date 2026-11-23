@@ -1,5 +1,6 @@
-// NEON BREAKER — day 7. Power-ups: one brick per level is a multi-ball brick.
-// Day 7: hit the glowing brick to split the ball in two. The game now tracks many balls.
+// NEON BREAKER — day 7 (final). High-score save + combo counter + start screen.
+// Day 7 final: the best score persists in localStorage, chained bricks build a combo,
+// and the game opens on a title screen (auto-play skips it).
 
 let audioCtx = null;
 function beep(freq, dur, type, vol) {
@@ -47,6 +48,10 @@ let levelFlash = 0; // frames left to show "LEVEL N"
 let particles = []; // {x, y, vx, vy, life, color, size}
 let trail = []; // last ball positions, fading
 let paused = false;
+let combo = 0; // day 7 final: chained bricks without a paddle touch
+let started = AUTO; // day 7 final: humans start on click; auto-play starts at once
+let best = 0; // day 7 final: persisted high score
+try { best = parseInt(localStorage.getItem('neon-breaker-best') || '0', 10) || 0; } catch (e) {}
 
 function buildBricks() {
   bricks = [];
@@ -110,6 +115,7 @@ function update() {
       ball.vy = -speed * Math.cos(angle);
       ball.y = PADDLE_Y - BALL_R;
       sfxPaddle();
+      combo = 0; // day 7 final: a paddle touch breaks the combo
     }
 
     // bricks
@@ -118,7 +124,12 @@ function update() {
       if (ball.x + BALL_R > b.x && ball.x - BALL_R < b.x + b.w &&
           ball.y + BALL_R > b.y && ball.y - BALL_R < b.y + b.h) {
         b.alive = false;
-        score += 10;
+        combo++; // day 7 final: chained bricks build the combo
+        score += 10 + combo;
+        if (score > best) {
+          best = score;
+          try { localStorage.setItem('neon-breaker-best', String(best)); } catch (e) {}
+        }
         sfxBrick();
         burst(b.x + b.w / 2, b.y + b.h / 2, b.color);
         // day 7: the power-up brick splits the ball in two
@@ -138,7 +149,7 @@ function update() {
 
   // drop balls that fell; if none are left, relaunch
   balls = balls.filter(b => b.y - BALL_R <= H);
-  if (balls.length === 0) { sfxLost(); resetBall(); }
+  if (balls.length === 0) { sfxLost(); combo = 0; resetBall(); }
 
   // all bricks cleared: next level (day 4) — rebuild, faster ball, flash the level
   if (bricks.every(b => !b.alive)) {
@@ -186,7 +197,7 @@ function draw() {
     }
   }
 
-  // HUD (day 2: score + bricks left; day 4: level)
+  // HUD (day 2: score + bricks; day 4: level; day 7 final: best + combo)
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 44px sans-serif';
   ctx.textAlign = 'left';
@@ -195,6 +206,15 @@ function draw() {
   ctx.fillText('LEVEL ' + level, W / 2, 80);
   ctx.textAlign = 'right';
   ctx.fillText('BRICKS ' + bricks.filter(b => b.alive).length, W - 32, 80);
+  ctx.textAlign = 'left';
+  ctx.font = 'bold 36px sans-serif';
+  ctx.fillStyle = '#ffee3a';
+  ctx.fillText('BEST ' + best, 32, 132);
+  if (combo >= 2) {
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#ff2d78';
+    ctx.fillText('COMBO x' + combo, W - 32, 132);
+  }
   ctx.textAlign = 'left';
 
   // level-up flash (day 4)
@@ -247,13 +267,38 @@ function draw() {
     ctx.fillText('Press P to resume', W / 2, H / 2 + 80);
     ctx.textAlign = 'left';
   }
+
+  // start screen (day 7 final)
+  if (!started) {
+    ctx.fillStyle = 'rgba(10, 10, 18, 0.75)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 110px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('NEON', W / 2, H / 2 - 60);
+    ctx.fillStyle = '#ff2d78';
+    ctx.fillText('BREAKER', W / 2, H / 2 + 60);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '44px sans-serif';
+    ctx.fillText('Click or tap to start', W / 2, H / 2 + 180);
+    ctx.font = '36px sans-serif';
+    ctx.fillStyle = '#ffee3a';
+    ctx.fillText('BEST ' + best, W / 2, H / 2 + 260);
+    ctx.textAlign = 'left';
+  }
 }
 
 function loop() {
-  if (!paused) update();
+  if (!paused && started) update();
   draw();
   requestAnimationFrame(loop);
 }
+
+// start screen (day 7 final): any click / key / touch starts the game
+function startGame() { started = true; }
+canvas.addEventListener('click', startGame);
+addEventListener('keydown', startGame);
+canvas.addEventListener('touchstart', startGame, { passive: true });
 
 // human controls (mouse / keys); auto-play overrides them when ?auto=1
 canvas.addEventListener('mousemove', e => {
