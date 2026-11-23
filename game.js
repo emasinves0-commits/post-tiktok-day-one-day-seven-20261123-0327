@@ -1,5 +1,5 @@
-// NEON BREAKER — day 6. Touch controls + pause.
-// Day 6: drag on touch to move the paddle; P (or the pause button) pauses the game.
+// NEON BREAKER — day 7. Power-ups: one brick per level is a multi-ball brick.
+// Day 7: hit the glowing brick to split the ball in two. The game now tracks many balls.
 
 let audioCtx = null;
 function beep(freq, dur, type, vol) {
@@ -39,7 +39,7 @@ const BALL_R = 18;
 const BALL_START = { x: 540, y: 1200, vx: 5, vy: -7 };
 
 let paddleX = (W - PADDLE_W) / 2;
-let ball = { ...BALL_START };
+let balls = [{ ...BALL_START }]; // day 7: many balls (multi-ball power-up)
 let bricks = [];
 let score = 0;
 let level = 1;
@@ -50,19 +50,22 @@ let paused = false;
 
 function buildBricks() {
   bricks = [];
+  // day 7: one random brick per level is a multi-ball power-up brick
+  const powerIdx = Math.floor(Math.random() * ROWS * COLS);
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       bricks.push({
         x: BRICK_LEFT + c * (BRICK_W + GAP),
         y: BRICK_TOP + r * (BRICK_H + GAP),
         w: BRICK_W, h: BRICK_H, alive: true, color: ROW_COLORS[r],
+        power: (r * COLS + c) === powerIdx,
       });
     }
   }
 }
 
 function resetBall() {
-  ball = { ...BALL_START };
+  balls = [{ ...BALL_START }];
 }
 
 function burst(x, y, color) {
@@ -78,53 +81,64 @@ function burst(x, y, color) {
 }
 
 function update() {
-  // paddle: auto-play tracks the ball; a human moves it with mouse / keys / touch
-  if (AUTO) {
-    const target = ball.x - PADDLE_W / 2;
+  // paddle: auto-play tracks the lowest ball; a human moves it with mouse / keys / touch
+  if (AUTO && balls.length > 0) {
+    const low = balls.reduce((a, b) => (b.y > a.y ? b : a), balls[0]);
+    const target = low.x - PADDLE_W / 2;
     paddleX += (target - paddleX) * 0.25;
     paddleX = Math.max(0, Math.min(W - PADDLE_W, paddleX));
   }
 
-  ball.x += ball.vx;
-  ball.y += ball.vy;
+  const spawned = [];
+  for (const ball of balls) {
+    ball.x += ball.vx;
+    ball.y += ball.vy;
 
-  // walls
-  if (ball.x - BALL_R < 0) { ball.x = BALL_R; ball.vx = Math.abs(ball.vx); sfxWall(); }
-  if (ball.x + BALL_R > W) { ball.x = W - BALL_R; ball.vx = -Math.abs(ball.vx); sfxWall(); }
-  if (ball.y - BALL_R < 0) { ball.y = BALL_R; ball.vy = Math.abs(ball.vy); sfxWall(); }
+    // walls
+    if (ball.x - BALL_R < 0) { ball.x = BALL_R; ball.vx = Math.abs(ball.vx); sfxWall(); }
+    if (ball.x + BALL_R > W) { ball.x = W - BALL_R; ball.vx = -Math.abs(ball.vx); sfxWall(); }
+    if (ball.y - BALL_R < 0) { ball.y = BALL_R; ball.vy = Math.abs(ball.vy); sfxWall(); }
 
-  // paddle
-  if (ball.vy > 0 &&
-      ball.y + BALL_R >= PADDLE_Y && ball.y + BALL_R <= PADDLE_Y + PADDLE_H + 12 &&
-      ball.x >= paddleX && ball.x <= paddleX + PADDLE_W) {
-    const hit = (ball.x - (paddleX + PADDLE_W / 2)) / (PADDLE_W / 2); // -1..1
-    const speed = Math.hypot(ball.vx, ball.vy);
-    const angle = hit * (Math.PI / 3); // up to 60 degrees
-    ball.vx = speed * Math.sin(angle);
-    ball.vy = -speed * Math.cos(angle);
-    ball.y = PADDLE_Y - BALL_R;
-    sfxPaddle();
-  }
+    // paddle
+    if (ball.vy > 0 &&
+        ball.y + BALL_R >= PADDLE_Y && ball.y + BALL_R <= PADDLE_Y + PADDLE_H + 12 &&
+        ball.x >= paddleX && ball.x <= paddleX + PADDLE_W) {
+      const hit = (ball.x - (paddleX + PADDLE_W / 2)) / (PADDLE_W / 2); // -1..1
+      const speed = Math.hypot(ball.vx, ball.vy);
+      const angle = hit * (Math.PI / 3); // up to 60 degrees
+      ball.vx = speed * Math.sin(angle);
+      ball.vy = -speed * Math.cos(angle);
+      ball.y = PADDLE_Y - BALL_R;
+      sfxPaddle();
+    }
 
-  // bricks
-  for (const b of bricks) {
-    if (!b.alive) continue;
-    if (ball.x + BALL_R > b.x && ball.x - BALL_R < b.x + b.w &&
-        ball.y + BALL_R > b.y && ball.y - BALL_R < b.y + b.h) {
-      b.alive = false;
-      score += 10;
-      sfxBrick();
-      burst(b.x + b.w / 2, b.y + b.h / 2, b.color);
-      // bounce: reverse the axis of least penetration
-      const overlapX = Math.min(ball.x + BALL_R - b.x, b.x + b.w - (ball.x - BALL_R));
-      const overlapY = Math.min(ball.y + BALL_R - b.y, b.y + b.h - (ball.y - BALL_R));
-      if (overlapX < overlapY) ball.vx = -ball.vx; else ball.vy = -ball.vy;
-      break;
+    // bricks
+    for (const b of bricks) {
+      if (!b.alive) continue;
+      if (ball.x + BALL_R > b.x && ball.x - BALL_R < b.x + b.w &&
+          ball.y + BALL_R > b.y && ball.y - BALL_R < b.y + b.h) {
+        b.alive = false;
+        score += 10;
+        sfxBrick();
+        burst(b.x + b.w / 2, b.y + b.h / 2, b.color);
+        // day 7: the power-up brick splits the ball in two
+        if (b.power && balls.length + spawned.length < 4) {
+          spawned.push({ x: ball.x, y: ball.y, vx: -ball.vx, vy: ball.vy });
+          beep(990, 0.2, 'sine', 0.1);
+        }
+        // bounce: reverse the axis of least penetration
+        const overlapX = Math.min(ball.x + BALL_R - b.x, b.x + b.w - (ball.x - BALL_R));
+        const overlapY = Math.min(ball.y + BALL_R - b.y, b.y + b.h - (ball.y - BALL_R));
+        if (overlapX < overlapY) ball.vx = -ball.vx; else ball.vy = -ball.vy;
+        break;
+      }
     }
   }
+  balls.push(...spawned);
 
-  // ball fell: relaunch (day 1 has no lives)
-  if (ball.y - BALL_R > H) { sfxLost(); resetBall(); }
+  // drop balls that fell; if none are left, relaunch
+  balls = balls.filter(b => b.y - BALL_R <= H);
+  if (balls.length === 0) { sfxLost(); resetBall(); }
 
   // all bricks cleared: next level (day 4) — rebuild, faster ball, flash the level
   if (bricks.every(b => !b.alive)) {
@@ -133,8 +147,8 @@ function update() {
     buildBricks();
     resetBall();
     const boost = 1 + 0.15 * (level - 1);
-    ball.vx = BALL_START.vx * boost;
-    ball.vy = BALL_START.vy * boost;
+    balls[0].vx = BALL_START.vx * boost;
+    balls[0].vy = BALL_START.vy * boost;
   }
   if (levelFlash > 0) levelFlash--;
 
@@ -144,20 +158,32 @@ function update() {
   }
   particles = particles.filter(p => p.life > 0);
 
-  // ball trail (day 5): keep the last 12 positions
-  trail.push({ x: ball.x, y: ball.y });
-  if (trail.length > 12) trail.shift();
+  // ball trail (day 5): keep the last 12 positions of the first ball
+  if (balls.length > 0) {
+    trail.push({ x: balls[0].x, y: balls[0].y });
+    if (trail.length > 12) trail.shift();
+  }
 }
 
 function draw() {
   ctx.fillStyle = '#0a0a12';
   ctx.fillRect(0, 0, W, H);
 
-  // bricks (day 2: one neon color per row)
+  // bricks (day 2: one neon color per row; day 7: the power-up brick glows white)
   for (const b of bricks) {
     if (!b.alive) continue;
     ctx.fillStyle = b.color;
     ctx.fillRect(b.x, b.y, b.w, b.h);
+    if (b.power) {
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(b.x + 2, b.y + 2, b.w - 4, b.h - 4);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 30px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('+', b.x + b.w / 2, b.y + b.h / 2 + 11);
+      ctx.textAlign = 'left';
+    }
   }
 
   // HUD (day 2: score + bricks left; day 4: level)
@@ -193,11 +219,13 @@ function draw() {
     ctx.fill();
   }
 
-  // ball
+  // balls (day 7: all of them)
   ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
-  ctx.fill();
+  for (const ball of balls) {
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   // particles (day 5)
   for (const p of particles) {
