@@ -1,5 +1,25 @@
-// NEON BREAKER — day 2. Score display + colored bricks.
-// Day 2: a HUD (score + bricks left) and a neon color per brick row.
+// NEON BREAKER — day 3. Sound effects (WebAudio synth bleeps).
+// Day 3: a tiny synth — paddle blip, brick break, wall tick, ball-lost fall.
+
+let audioCtx = null;
+function beep(freq, dur, type, vol) {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type || 'square';
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(vol || 0.08, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + dur);
+  } catch (e) { /* audio unavailable (headless): play on silently */ }
+}
+const sfxPaddle = () => beep(220, 0.08, 'square', 0.06);
+const sfxBrick = () => beep(660, 0.12, 'square', 0.08);
+const sfxWall = () => beep(180, 0.05, 'triangle', 0.04);
+const sfxLost = () => beep(110, 0.3, 'sawtooth', 0.07);
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -52,9 +72,9 @@ function update() {
   ball.y += ball.vy;
 
   // walls
-  if (ball.x - BALL_R < 0) { ball.x = BALL_R; ball.vx = Math.abs(ball.vx); }
-  if (ball.x + BALL_R > W) { ball.x = W - BALL_R; ball.vx = -Math.abs(ball.vx); }
-  if (ball.y - BALL_R < 0) { ball.y = BALL_R; ball.vy = Math.abs(ball.vy); }
+  if (ball.x - BALL_R < 0) { ball.x = BALL_R; ball.vx = Math.abs(ball.vx); sfxWall(); }
+  if (ball.x + BALL_R > W) { ball.x = W - BALL_R; ball.vx = -Math.abs(ball.vx); sfxWall(); }
+  if (ball.y - BALL_R < 0) { ball.y = BALL_R; ball.vy = Math.abs(ball.vy); sfxWall(); }
 
   // paddle
   if (ball.vy > 0 &&
@@ -66,6 +86,7 @@ function update() {
     ball.vx = speed * Math.sin(angle);
     ball.vy = -speed * Math.cos(angle);
     ball.y = PADDLE_Y - BALL_R;
+    sfxPaddle();
   }
 
   // bricks
@@ -75,6 +96,7 @@ function update() {
         ball.y + BALL_R > b.y && ball.y - BALL_R < b.y + b.h) {
       b.alive = false;
       score += 10;
+      sfxBrick();
       // bounce: reverse the axis of least penetration
       const overlapX = Math.min(ball.x + BALL_R - b.x, b.x + b.w - (ball.x - BALL_R));
       const overlapY = Math.min(ball.y + BALL_R - b.y, b.y + b.h - (ball.y - BALL_R));
@@ -84,7 +106,7 @@ function update() {
   }
 
   // ball fell: relaunch (day 1 has no lives)
-  if (ball.y - BALL_R > H) resetBall();
+  if (ball.y - BALL_R > H) { sfxLost(); resetBall(); }
 
   // all bricks cleared: rebuild (day 1 has no levels)
   if (bricks.every(b => !b.alive)) buildBricks();
